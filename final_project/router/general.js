@@ -3,7 +3,21 @@ let books = require("./booksdb.js");
 let isValid = require("./auth_users.js").isValid;
 let users = require("./auth_users.js").users;
 const axios = require('axios');
+const vm = require('vm');
 const public_users = express.Router();
+
+// Fetch the booksdb.js file from GitHub (Task requirement: use Axios).
+// The fetched file is JS (module.exports = books), so we evaluate it in a sandbox.
+const BOOKS_DB_URL =
+  'https://raw.githubusercontent.com/JAZ-CO/expressBookReviews/main/final_project/router/booksdb.js';
+
+async function fetchBooksFromRemote() {
+  const response = await axios.get(BOOKS_DB_URL);
+  const code = response.data;
+  const sandbox = { module: { exports: {} }, exports: {} };
+  vm.runInNewContext(code, sandbox);
+  return sandbox.module.exports;
+}
 
 
 public_users.post("/register", (req,res) => {
@@ -22,90 +36,77 @@ public_users.post("/register", (req,res) => {
 });
 
 // Get the book list available in the shop
-public_users.get('/',function (req, res) {
-  //Write your code here'
-  axios.get('https://github.com/JAZ-CO/expressBookReviews/blob/main/final_project/router/booksdb.js').then(response => {
-    return res.status(300).send(JSON.stringify(response.data,null,4));
-  }).catch(error => {
-    return res.status(500).send(JSON.stringify({message: "Error fetching books"},null,4));
-  });
+public_users.get('/', async function (req, res) {
+  try {
+    const booksFromRemote = await fetchBooksFromRemote();
+    return res.status(300).send(JSON.stringify(booksFromRemote, null, 4));
+  } catch (error) {
+    return res.status(500).send(JSON.stringify({ message: "Error fetching books" }, null, 4));
+  }
 });
 
 // Get book details based on ISBN
-public_users.get('/isbn/:isbn',function (req, res) {
-  //Write your code here
-  let book = null;
-  axios.get('https://github.com/JAZ-CO/expressBookReviews/blob/main/final_project/router/booksdb.js').then(response => {
-    book = response.data[req.params.isbn];
-    }).catch(error => {
-    return res.status(500).send(JSON.stringify({message: "Error fetching book"},null,4));
-  });
-  if(book){
-  return res.status(300).send(JSON.stringify(book,null,4));
-  } else {
-    return res.status(500).send(JSON.stringify({message: "ISBN not found"},null,4));
+public_users.get('/isbn/:isbn', async function (req, res) {
+  try {
+    const booksFromRemote = await fetchBooksFromRemote();
+    const book = booksFromRemote[req.params.isbn] || null;
+    if (book) {
+      return res.status(300).send(JSON.stringify(book, null, 4));
+    }
+    return res.status(500).send(JSON.stringify({ message: "ISBN not found" }, null, 4));
+  } catch (error) {
+    return res.status(500).send(JSON.stringify({ message: "Error fetching book" }, null, 4));
   }
- });
+});
   
 // Get book details based on author
-public_users.get('/author/:author',function (req, res) {
-  //Write your code here
-  let book = null;
-  axios.get('https://github.com/JAZ-CO/expressBookReviews/blob/main/final_project/router/booksdb.js').then(response => {
-    books = response.data;
-    for(let i = 1; i <= Object.keys(books).length; i++){
-      if(books[i].author === req.params.author){
-        book = books[i];
-        break;
-      }
+public_users.get('/author/:author', async function (req, res) {
+  try {
+    const booksFromRemote = await fetchBooksFromRemote();
+    const author = req.params.author;
+    const book =
+      Object.values(booksFromRemote).find((b) => b.author === author) || null;
+
+    if (book) {
+      return res.status(300).send(JSON.stringify(book, null, 4));
     }
-    }).catch(error => {
-    return res.status(500).send(JSON.stringify({message: "Error fetching book"},null,4));
-  });
-  if(book){
-  return res.status(300).send(JSON.stringify(book,null,4));
-  } else {
-    return res.status(500).send(JSON.stringify({message: "Author not found"},null,4));
+    return res.status(500).send(JSON.stringify({ message: "Author not found" }, null, 4));
+  } catch (error) {
+    return res.status(500).send(JSON.stringify({ message: "Error fetching book" }, null, 4));
   }
 });
 
 // Get all books based on title
-public_users.get('/title/:title',function (req, res) {
-  //Write your code here
-  let book = null;
-  axios.get('https://github.com/JAZ-CO/expressBookReviews/blob/main/final_project/router/booksdb.js').then(response => {
-    books = response.data;
-    for(let i = 1; i <= Object.keys(books).length; i++){
-      if(books[i].title === req.params.title){
-        book = books[i];
-        break;
-      }
+public_users.get('/title/:title', async function (req, res) {
+  try {
+    const booksFromRemote = await fetchBooksFromRemote();
+    const title = req.params.title;
+    const book = Object.values(booksFromRemote).find((b) => b.title === title) || null;
+
+    if (book) {
+      return res.status(300).send(JSON.stringify(book, null, 4));
     }
-    }).catch(error => {
-    return res.status(500).send(JSON.stringify({message: "Error fetching book"},null,4));
-  });
-  if(book){
-  return res.status(300).send(JSON.stringify(book,null,4));
-  } else {
-    return res.status(500).send(JSON.stringify({message: "Title not found"},null,4));
+    return res.status(500).send(JSON.stringify({ message: "Title not found" }, null, 4));
+  } catch (error) {
+    return res.status(500).send(JSON.stringify({ message: "Error fetching book" }, null, 4));
   }
 });
 
 //  Get book review
-public_users.get('/review/:isbn',function (req, res) {
-  //Write your code here
-  // check if isbn exists in books
-  let review = null;
-  axios.get('https://github.com/JAZ-CO/expressBookReviews/blob/main/final_project/router/booksdb.js').then(response => {
-    books = response.data;
-    review = books[req.params.isbn].reviews;
-    }).catch(error => {
-    return res.status(500).send(JSON.stringify({message: "Error fetching review"},null,4));
-  });
-  if(review){
-  return res.status(300).send(JSON.stringify(review,null,4));
-  } else {
-    return res.status(500).send(JSON.stringify({message: "Review not found"},null,4));
+public_users.get('/review/:isbn', async function (req, res) {
+  try {
+    const booksFromRemote = await fetchBooksFromRemote();
+    const isbn = req.params.isbn;
+    const book = booksFromRemote[isbn];
+
+    if (!book) {
+      return res.status(500).send(JSON.stringify({ message: "ISBN not found" }, null, 4));
+    }
+
+    const review = book.reviews;
+    return res.status(300).send(JSON.stringify(review, null, 4));
+  } catch (error) {
+    return res.status(500).send(JSON.stringify({ message: "Error fetching review" }, null, 4));
   }
 });
 
